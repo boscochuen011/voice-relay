@@ -4,8 +4,6 @@
 
 手機開網頁，撳入文字欄用**鍵盤內置嘅 🎤 聽寫**講嘢（iPhone／Android 都支援廣東話），文字即時經 WebSocket 出現喺電腦嘅同一個網頁度，一撳就 copy。
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/boscochuen011/voice-relay)
-
 ## ✨ 功能
 
 - 🎤 **語音輸入** — 用手機鍵盤內置聽寫（穩定、支援廣東話、唔使任何權限設定）
@@ -22,13 +20,16 @@
 3. 手機相機掃個 QR code → 自動入房
 4. 手機撳入文字欄 → 撳鍵盤上嘅 **🎤** → 講嘢 → 撳「送出」→ 電腦即時見到 → 撳「複製」
 
-## 🚀 部署（固定網址，唔使開電腦）
+## 🚀 部署（固定網址，唔使開電腦，唔使信用卡）
 
-撳上面個 **Deploy to Render** 掣：
+用 [Render](https://dashboard.render.com) 開一個普通 Web Service（**唔好**用 Blueprint 方式，嗰個要入卡）：
 
-1. 用 GitHub 帳號登入 Render（免費）
-2. 撳 **Deploy** — 佢會自動讀 `render.yaml`，唔使填任何嘢
-3. 幾分鐘後就有一個固定網址，例如 `https://voice-relay-xxxx.onrender.com`
+1. 用 GitHub 帳號登入 [dashboard.render.com](https://dashboard.render.com)
+2. 撳 **New +** → **Web Service** → 揀呢個 repo → **Connect**
+3. 設定會自動偵測（Node / `npm install` / `npm start`），**Instance Type 揀 Free**
+4. 撳 **Deploy Web Service**
+
+幾分鐘後就有固定網址，例如 `https://voice-relay-xxxx.onrender.com`。
 
 > 💡 免費層閒置 15 分鐘會瞓覺，再次打開要等大約 30–60 秒起身，之後就正常快。
 
