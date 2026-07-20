@@ -54,6 +54,7 @@
   }
   .logo { font-size: 17px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
   .logo .dot { color: var(--accent); }
+  .logo .ver { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 6px; }
   .status {
     margin-left: auto; display: flex; align-items: center; gap: 6px;
     font-size: 12px; color: var(--muted); white-space: nowrap;
@@ -210,7 +211,7 @@
 
 <header>
   <div class="wrap header-row">
-    <div class="logo">語音直送<span class="dot">。</span></div>
+    <div class="logo">語音直送<span class="dot">。</span><span class="ver">v1.2</span></div>
     <div class="status" id="status"><span class="led"></span><span id="statusText">未連接</span></div>
   </div>
 </header>
@@ -521,7 +522,7 @@
   // ---------- 語音識別 ----------
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var rec = null, listening = false, interimTimer = null;
-  var recStartTime = 0, fastEndCount = 0, micReady = false;
+  var recStartTime = 0, fastEndCount = 0;
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -545,27 +546,39 @@
 
   function permissionHint() {
     if (isIOS) {
-      setHint('iPhone 收音要兩樣嘢：① 設定 → Apps → Safari → 咪高風 → 允許（同埋畀呢個網站用咪高風）；② 設定 → 一般 → 鍵盤 → 開啟「聽寫」。搞掂返嚟撳過「開始收音」。');
+      setHint('iPhone 收音要兩樣嘢：① 設定 → Safari（或 設定 → Apps → Safari）→ 咪高風 → 允許；② 設定 → 一般 → 鍵盤 → 開啟「聽寫」。搞掂返嚟撳過「開始收音」。');
     } else {
       setHint('瀏覽器封鎖咗咪高風。撳網址列左邊個鎖／設定圖示，將「麥克風」設做允許，再撳過「開始收音」。');
     }
   }
 
-  // Safari 對 SpeechRecognition 嘅權限提示好唔穩陣，
-  // 所以先用 getUserMedia 正式問一次咪高風權限，成功先開始識別
-  function ensureMic() {
-    if (micReady) return Promise.resolve();
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve();
-    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+  // 收音出權限錯誤時，用 getUserMedia 檢查係「咪高風權限」定「語音識別服務」嘅問題，
+  // 顯示啱嘅指示，並且附上錯誤代碼方便排查
+  function diagnoseMic(code) {
+    var suffix = '（錯誤代碼：' + code + '）';
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      permissionHint();
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
       stream.getTracks().forEach(function (t) { t.stop(); });
-      micReady = true;
+      // 咪高風權限係有嘅 → 問題出喺語音識別服務本身
+      setHint(isIOS
+        ? '咪高風權限正常，但語音識別服務開唔到。iPhone 請去 設定 → 一般 → 鍵盤 → 開啟「聽寫」（Safari 嘅語音識別靠系統聽寫服務），開完返嚟再撳「開始收音」。' + suffix
+        : '咪高風權限正常，但語音識別服務開唔到，檢查下網絡再試過。' + suffix);
+    }, function () {
+      // 連咪高風都攞唔到 → 權限問題
+      setHint(isIOS
+        ? '未有咪高風權限。去 設定 → Safari（或 設定 → Apps → Safari）→ 咪高風 → 揀「允許」，之後閂咗呢頁重開，再撳「開始收音」。如果頁面有彈權限提示，記得撳允許。' + suffix
+        : '瀏覽器封鎖咗咪高風。撳網址列左邊個鎖圖示，將「麥克風」設做允許，再撳「開始收音」。' + suffix);
     });
   }
 
   function beginRecognition() {
     rec = new SR();
     rec.lang = $('langSel').value;
-    rec.continuous = true;
+    // iOS Safari 嘅 continuous 模式好唔穩陣，改用短段錄音＋自動重啟
+    rec.continuous = !isIOS;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
@@ -602,8 +615,8 @@
           stopRec();
           // 頭一嗱撳掣就出錯 = 真係權限問題；行咗一排先出錯 = 系統自動斷咗
           if (Date.now() - recStartTime < 3000) {
-            permissionHint();
-            toast('收唔到音，睇下下面嘅設定指示');
+            diagnoseMic(ev.error);
+            toast('收唔到音，睇下下面嘅指示');
           } else {
             setHint('收音被系統停咗，撳過「開始收音」就得。');
             toast('收音停咗，請再撳一次');
@@ -653,10 +666,9 @@
 
   function startRec() {
     if (!SR || listening) return;
-    ensureMic().then(beginRecognition, function () {
-      permissionHint();
-      toast('攞唔到咪高風權限');
-    });
+    // 一定要喺用戶撳掣嗰下「同步」啟動識別 —
+    // iOS Safari 會當經過異步步驟之後嘅 start() 唔係用戶操作而直接封鎖
+    beginRecognition();
   }
 
   function stopRec() {

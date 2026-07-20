@@ -5,7 +5,14 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    // HTML 每次都要問 server 攞最新版，手機 Safari 先唔會死攬舊 cache
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
