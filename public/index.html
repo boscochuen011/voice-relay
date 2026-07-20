@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>語音直送 · 手機講嘢，電腦收字</title>
+<style>
+  :root {
+    --bg: #f5f7f6;
+    --surface: #ffffff;
+    --text: #1c2321;
+    --muted: #66716c;
+    --accent: #0f766e;
+    --accent-ink: #ffffff;
+    --rec: #dc2626;
+    --border: #dce3e0;
+    --shadow: 0 1px 3px rgba(28, 35, 33, .08);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101513;
+      --surface: #1a201d;
+      --text: #e8ede9;
+      --muted: #8fa39a;
+      --accent: #34c8b2;
+      --accent-ink: #0c1512;
+      --rec: #f87171;
+      --border: #2a332f;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wrap { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 0;
+  }
+  .logo { font-size: 17px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+  .logo .dot { color: var(--accent); }
+  .status {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted); white-space: nowrap;
+  }
+  .status .led {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); flex: none;
+  }
+  .status.on .led { background: var(--accent); }
+
+  /* 登入畫面 */
+  #login { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 28px 24px; width: 100%; max-width: 400px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .login-card h1 { font-size: 22px; text-wrap: balance; }
+  .login-card p { font-size: 14px; color: var(--muted); }
+  label { font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+  input[type=text] {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+  }
+  input[type=text]:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 10px 16px;
+  }
+  button.primary {
+    background: var(--accent); color: var(--accent-ink);
+    border-color: var(--accent); font-weight: 700; font-size: 16px; padding: 12px 16px;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* 主畫面 */
+  #main { flex: 1; display: none; flex-direction: column; }
+  #main.active { display: flex; }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 14px 0 10px;
+  }
+  .room-chip {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 13px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 12px; color: var(--muted);
+  }
+  .toolbar .spacer { flex: 1; }
+  .toolbar button { font-size: 13px; padding: 6px 12px; }
+
+  #list { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-bottom: 180px; }
+  .empty {
+    text-align: center; color: var(--muted); font-size: 14px;
+    padding: 48px 16px;
+  }
+  .item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 12px 14px;
+  }
+  .item .text { font-size: 17px; white-space: pre-wrap; word-break: break-word; }
+  .item .meta {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  }
+  .item .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .item .meta .spacer { flex: 1; }
+  .item button { font-size: 12px; padding: 4px 10px; }
+  .item button.copied { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  #interim {
+    display: none; border: 1px dashed var(--accent);
+    border-radius: var(--radius); padding: 12px 14px;
+    font-size: 17px; color: var(--muted); font-style: italic;
+  }
+  #interim.show { display: block; }
+
+  /* 底部收音區 */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .dock-inner { max-width: 720px; margin: 0 auto; padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .dock-row { display: flex; align-items: center; gap: 10px; }
+  select {
+    font: inherit; font-size: 14px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+  }
+  #micBtn {
+    flex: 1; font-size: 17px; font-weight: 700; padding: 14px;
+    border-radius: 10px; background: var(--accent); color: var(--accent-ink);
+    border-color: var(--accent);
+    transition: background .15s ease;
+  }
+  #micBtn.recording { background: var(--rec); border-color: var(--rec); color: #fff; }
+  @media (prefers-reduced-motion: no-preference) {
+    #micBtn.recording { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { filter: brightness(1.15); } }
+  }
+  #micHint { font-size: 12px; color: var(--muted); text-align: center; }
+  .typebar { display: flex; gap: 8px; }
+  .typebar textarea {
+    flex: 1; font: inherit; font-size: 16px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+    resize: none; height: 44px; line-height: 24px;
+  }
+  /* QR modal */
+  .modal {
+    display: none; position: fixed; inset: 0; z-index: 40;
+    background: rgba(0, 0, 0, .55);
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .modal.show { display: flex; }
+  .modal-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 24px; width: 100%; max-width: 360px;
+    display: flex; flex-direction: column; gap: 14px; text-align: center;
+  }
+  .modal-card h2 { font-size: 18px; }
+  .modal-card p { font-size: 13px; color: var(--muted); }
+  /* QR 一定要黑白高對比先掃得到，唔跟主題色 */
+  #qrBox {
+    background: #ffffff; border-radius: 8px; padding: 12px;
+    align-self: center; line-height: 0;
+  }
+  #qrBox svg { width: 220px; height: 220px; }
+  .qr-room {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 14px; color: var(--muted);
+  }
+  .modal-actions { display: flex; gap: 8px; justify-content: center; }
+
+  #toast {
+    position: fixed; bottom: calc(150px + env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%);
+    background: var(--text); color: var(--bg);
+    padding: 8px 18px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 30;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-row">
+    <div class="logo">語音直送<span class="dot">。</span></div>
+    <div class="status" id="status"><span class="led"></span><span id="statusText">未連接</span></div>
+  </div>
+</header>
+
+<!-- 登入：輸入房間碼 -->
+<section id="login">
+  <form class="login-card" id="loginForm">
+    <h1>手機講嘢，電腦收字</h1>
+    <p>兩部裝置輸入<strong>同一個房間碼</strong>就會連埋一齊：手機負責收音，電腦即時見到文字、一撳就 copy。房間碼自己作，愈難估愈私隱。</p>
+    <div>
+      <label for="roomInput">房間碼</label>
+      <input type="text" id="roomInput" placeholder="例如 bosco-0721" autocomplete="off" maxlength="64" required>
+    </div>
+    <button type="submit" class="primary">進入房間</button>
+  </form>
+</section>
+
+<!-- 主畫面 -->
+<section id="main">
+  <div class="wrap toolbar">
+    <span class="room-chip" id="roomChip"></span>
+    <span class="spacer"></span>
+    <button id="qrBtn">📱 QR 入房</button>
+    <button id="copyAllBtn">全部複製</button>
+    <button id="clearBtn">清空</button>
+    <button id="leaveBtn">離開</button>
+  </div>
+  <div class="wrap" style="flex:1;display:flex;flex-direction:column;">
+    <div id="list"><div class="empty" id="emptyHint">未有紀錄。用手機撳「開始收音」講嘢，文字會即時出現喺度。</div></div>
+    <div id="interim"></div>
+  </div>
+
+  <div class="dock">
+    <div class="dock-inner">
+      <div class="dock-row" id="micRow">
+        <select id="langSel" title="語音語言">
+          <option value="yue-Hant-HK">廣東話</option>
+          <option value="zh-HK">中文（香港）</option>
+          <option value="zh-TW">國語（繁體）</option>
+          <option value="zh-CN">普通話（簡體）</option>
+          <option value="en-US">English</option>
+        </select>
+        <button id="micBtn">🎙️ 開始收音</button>
+      </div>
+      <div id="micHint"></div>
+      <div class="typebar">
+        <textarea id="typeInput" placeholder="又或者打字／用鍵盤咪高風輸入…" rows="1"></textarea>
+        <button id="sendBtn">送出</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="modal" id="qrModal">
+  <div class="modal-card">
+    <h2>手機掃碼入房</h2>
+    <div id="qrBox"></div>
+    <div class="qr-room" id="qrRoomLabel"></div>
+    <p>用手機相機對住個 QR code 掃一掃，會自動開網頁兼入埋呢間房，唔使打房間碼。</p>
+    <div class="modal-actions">
+      <button id="copyLinkBtn">複製連結</button>
+      <button id="qrCloseBtn" class="primary">閂埋</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var ws = null, room = '', reconnectTimer = null, manualLeave = false;
+
+  // ---------- UI helpers ----------
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+
+  function setStatus(on, text) {
+    $('status').classList.toggle('on', on);
+    $('statusText').textContent = text;
+  }
+
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function copyText(text, btn) {
+    var done = function () {
+      if (btn) {
+        var old = btn.textContent;
+        btn.textContent = '✓ 已複製';
+        btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = old; btn.classList.remove('copied'); }, 1500);
+      } else {
+        toast('已複製');
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text); done(); });
+    } else {
+      legacyCopy(text); done();
+    }
+  }
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  // ---------- 列表 ----------
+  function addItem(item, scroll) {
+    $('emptyHint') && $('emptyHint').remove();
+    var div = document.createElement('div');
+    div.className = 'item';
+    div.dataset.id = item.id;
+
+    var text = document.createElement('div');
+    text.className = 'text';
+    text.textContent = item.text;
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    var time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = fmtTime(item.ts);
+    var spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    var copyBtn = document.createElement('button');
+    copyBtn.textContent = '複製';
+    copyBtn.addEventListener('click', function () { copyText(item.text, copyBtn); });
+    var delBtn = document.createElement('button');
+    delBtn.textContent = '刪除';
+    delBtn.addEventListener('click', function () {
+      send({ type: 'delete', id: item.id });
+      div.remove();
+    });
+    meta.appendChild(time); meta.appendChild(spacer); meta.appendChild(copyBtn); meta.appendChild(delBtn);
+    div.appendChild(text); div.appendChild(meta);
+    $('list').appendChild(div);
+    if (scroll !== false) {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  function clearList() {
+    $('list').innerHTML = '<div class="empty" id="emptyHint">未有紀錄。用手機撳「開始收音」講嘢，文字會即時出現喺度。</div>';
+  }
+
+  function allText() {
+    var out = [];
+    document.querySelectorAll('#list .item .text').forEach(function (el) { out.push(el.textContent); });
+    return out.join('\n');
+  }
+
+  // ---------- WebSocket ----------
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+  }
+
+  function connect() {
+    var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    ws = new WebSocket(proto + location.host);
+    setStatus(false, '連接中…');
+
+    ws.onopen = function () {
+      send({ type: 'join', room: room });
+    };
+    ws.onmessage = function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      switch (msg.type) {
+        case 'history':
+          clearList();
+          msg.items.forEach(function (it) { addItem(it, false); });
+          window.scrollTo(0, document.body.scrollHeight);
+          setStatus(true, '已連接 · ' + msg.count + ' 部裝置');
+          break;
+        case 'presence':
+          setStatus(true, '已連接 · ' + msg.count + ' 部裝置');
+          break;
+        case 'final':
+          addItem(msg.item);
+          hideInterim();
+          break;
+        case 'interim':
+          showInterim(msg.text);
+          break;
+        case 'delete':
+          var el = document.querySelector('.item[data-id="' + msg.id + '"]');
+          if (el) el.remove();
+          break;
+        case 'clear':
+          clearList();
+          break;
+      }
+    };
+    ws.onclose = function () {
+      setStatus(false, '斷咗線');
+      if (!manualLeave) {
+        reconnectTimer = setTimeout(connect, 2000);
+      }
+    };
+    ws.onerror = function () { ws.close(); };
+  }
+
+  function showInterim(text) {
+    var el = $('interim');
+    if (!text) { hideInterim(); return; }
+    el.textContent = text;
+    el.classList.add('show');
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  function hideInterim() {
+    $('interim').classList.remove('show');
+    $('interim').textContent = '';
+  }
+
+  // ---------- 登入 / 離開 ----------
+  function enterRoom(name) {
+    room = name;
+    localStorage.setItem('vr-room', room);
+    $('roomChip').textContent = '房間：' + room;
+    $('login').style.display = 'none';
+    $('main').classList.add('active');
+    manualLeave = false;
+    connect();
+  }
+
+  $('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('roomInput').value.trim();
+    if (name) enterRoom(name);
+  });
+
+  $('leaveBtn').addEventListener('click', function () {
+    manualLeave = true;
+    clearTimeout(reconnectTimer);
+    stopRec();
+    if (ws) ws.close();
+    localStorage.removeItem('vr-room');
+    $('main').classList.remove('active');
+    $('login').style.display = 'flex';
+    setStatus(false, '未連接');
+    clearList();
+  });
+
+  // ---------- QR code 入房 ----------
+  function roomLink() {
+    return location.origin + '/?room=' + encodeURIComponent(room);
+  }
+
+  $('qrBtn').addEventListener('click', function () {
+    var qr = window.qrcode(0, 'M');
+    qr.addData(roomLink());
+    qr.make();
+    $('qrBox').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+    $('qrRoomLabel').textContent = '房間：' + room;
+    $('qrModal').classList.add('show');
+  });
+  $('qrCloseBtn').addEventListener('click', function () {
+    $('qrModal').classList.remove('show');
+  });
+  $('qrModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+  $('copyLinkBtn').addEventListener('click', function () {
+    copyText(roomLink(), null);
+  });
+
+  $('copyAllBtn').addEventListener('click', function () {
+    var t = allText();
+    if (!t) { toast('未有嘢可以複製'); return; }
+    copyText(t, null);
+  });
+
+  $('clearBtn').addEventListener('click', function () {
+    if (confirm('確定清空成個房間嘅紀錄？兩邊裝置都會清走。')) {
+      send({ type: 'clear' });
+      clearList();
+    }
+  });
+
+  // ---------- 打字送出 ----------
+  function sendTyped() {
+    var v = $('typeInput').value.trim();
+    if (!v) return;
+    send({ type: 'final', text: v });
+    $('typeInput').value = '';
+  }
+  $('sendBtn').addEventListener('click', sendTyped);
+  $('typeInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTyped(); }
+  });
+
+  // ---------- 語音識別 ----------
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, listening = false, interimTimer = null;
+  var recStartTime = 0, fastEndCount = 0, micReady = false;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  var DEFAULT_HINT = '用手機開呢頁撳「開始收音」，講嘢會即時傳去所有連接咗嘅裝置。';
+  function setHint(text) { $('micHint').textContent = text; }
+
+  var savedLang = localStorage.getItem('vr-lang');
+  if (savedLang) $('langSel').value = savedLang;
+  $('langSel').addEventListener('change', function () {
+    localStorage.setItem('vr-lang', this.value);
+    if (listening) { stopRec(); startRec(); }
+  });
+
+  if (!SR) {
+    $('micBtn').disabled = true;
+    $('micBtn').textContent = '🎙️ 此瀏覽器唔支援收音';
+    setHint('請用手機 Chrome 或 Safari 開呢頁；或者用下面文字欄，撳鍵盤上嘅咪高風做語音輸入。');
+  } else {
+    setHint(DEFAULT_HINT);
+  }
+
+  function permissionHint() {
+    if (isIOS) {
+      setHint('iPhone 收音要兩樣嘢：① 設定 → Apps → Safari → 咪高風 → 允許（同埋畀呢個網站用咪高風）；② 設定 → 一般 → 鍵盤 → 開啟「聽寫」。搞掂返嚟撳過「開始收音」。');
+    } else {
+      setHint('瀏覽器封鎖咗咪高風。撳網址列左邊個鎖／設定圖示，將「麥克風」設做允許，再撳過「開始收音」。');
+    }
+  }
+
+  // Safari 對 SpeechRecognition 嘅權限提示好唔穩陣，
+  // 所以先用 getUserMedia 正式問一次咪高風權限，成功先開始識別
+  function ensureMic() {
+    if (micReady) return Promise.resolve();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve();
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      micReady = true;
+    });
+  }
+
+  function beginRecognition() {
+    rec = new SR();
+    rec.lang = $('langSel').value;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = function (ev) {
+      fastEndCount = 0; // 收到嘢，證明行得順
+      var interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var res = ev.results[i];
+        var txt = res[0].transcript;
+        if (res.isFinal) {
+          txt = txt.trim();
+          if (txt) send({ type: 'final', text: txt });
+        } else {
+          interim += txt;
+        }
+      }
+      // interim 每 250ms 至送一次，慳流量
+      if (interim) {
+        showInterim(interim);
+        if (!interimTimer) {
+          interimTimer = setTimeout(function () { interimTimer = null; }, 250);
+          send({ type: 'interim', text: interim });
+        }
+      } else {
+        hideInterim();
+        send({ type: 'interim', text: '' });
+      }
+    };
+
+    rec.onerror = function (ev) {
+      switch (ev.error) {
+        case 'not-allowed':
+        case 'service-not-allowed':
+          stopRec();
+          // 頭一嗱撳掣就出錯 = 真係權限問題；行咗一排先出錯 = 系統自動斷咗
+          if (Date.now() - recStartTime < 3000) {
+            permissionHint();
+            toast('收唔到音，睇下下面嘅設定指示');
+          } else {
+            setHint('收音被系統停咗，撳過「開始收音」就得。');
+            toast('收音停咗，請再撳一次');
+          }
+          break;
+        case 'audio-capture':
+          stopRec();
+          setHint('搵唔到咪高風，檢查下部機有冇咪、有冇畀其他 App 霸住。');
+          break;
+        case 'network':
+          // 語音識別要靠系統網絡服務，斷網會出呢個錯，由 onend 重試
+          setHint('語音服務網絡有問題，重試緊…如果一直唔得，檢查下電話網絡。');
+          break;
+        // no-speech / aborted 唔使理，onend 會自動重啟
+      }
+    };
+
+    rec.onend = function () {
+      if (!listening) return;
+      // 開始唔夠一秒就完 = 可能死循環，斷五次就停低等用戶再撳
+      if (Date.now() - recStartTime < 1000) {
+        fastEndCount++;
+        if (fastEndCount >= 5) {
+          stopRec();
+          setHint(isIOS
+            ? 'Safari 收音斷咗好多次。試下：閂咗其他用緊咪嘅 App，或者確認 設定 → 一般 → 鍵盤 →「聽寫」開咗，然後再撳「開始收音」。'
+            : '收音斷咗好多次，檢查下咪高風權限同網絡，再撳「開始收音」。');
+          return;
+        }
+      }
+      // 手機瀏覽器成日自動停，聽緊嘅話就稍等再重啟
+      setTimeout(function () {
+        if (!listening || !rec) return;
+        recStartTime = Date.now();
+        try { rec.start(); } catch (e) { /* 已經行緊 */ }
+      }, 250);
+    };
+
+    recStartTime = Date.now();
+    try { rec.start(); } catch (e) { return; }
+    listening = true;
+    fastEndCount = 0;
+    setHint(DEFAULT_HINT);
+    $('micBtn').classList.add('recording');
+    $('micBtn').textContent = '⏹ 停止收音（錄緊…）';
+  }
+
+  function startRec() {
+    if (!SR || listening) return;
+    ensureMic().then(beginRecognition, function () {
+      permissionHint();
+      toast('攞唔到咪高風權限');
+    });
+  }
+
+  function stopRec() {
+    listening = false;
+    if (rec) {
+      rec.onend = null;
+      try { rec.stop(); } catch (e) {}
+      rec = null;
+    }
+    hideInterim();
+    send({ type: 'interim', text: '' });
+    $('micBtn').classList.remove('recording');
+    $('micBtn').textContent = '🎙️ 開始收音';
+  }
+
+  $('micBtn').addEventListener('click', function () {
+    if (listening) stopRec(); else startRec();
+  });
+
+  // ---------- 自動入房：QR 連結優先，其次上次嘅房 ----------
+  var urlRoom = new URLSearchParams(location.search).get('room');
+  if (urlRoom) {
+    history.replaceState(null, '', location.pathname); // 房間碼唔好留喺網址列
+    enterRoom(urlRoom.trim().slice(0, 64));
+  } else {
+    var savedRoom = localStorage.getItem('vr-room');
+    if (savedRoom) enterRoom(savedRoom);
+  }
+})();
+</script>
+</body>
+</html>

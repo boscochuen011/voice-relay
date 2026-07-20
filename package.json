@@ -1,0 +1,14 @@
+{
+  "name": "voice-relay",
+  "version": "1.0.0",
+  "description": "手機語音輸入，電腦即時顯示",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode-generator": "^2.0.4",
+    "ws": "^8.18.0"
+  }
+}
